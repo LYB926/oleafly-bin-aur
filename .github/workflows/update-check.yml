@@ -1,0 +1,73 @@
+name: Check Upstream Release
+
+on:
+  schedule:
+    # Run daily at 04:00 UTC
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional specific upstream version (e.g. 0.4.12)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install Arch packaging and verification tools
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git minisign python curl base64 >/dev/null 2>&1 || \
+          pacman -Syu --noconfirm --needed base-devel git minisign python curl
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure non-root builder for makepkg
+        run: |
+          useradd -m builder || true
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Check upstream release, verify Minisign, and update PKGBUILD
+        env:
+          TARGET_VERSION: ${{ inputs.version }}
+        run: |
+          args=()
+          if [ -n "$TARGET_VERSION" ]; then
+            args+=(--version "$TARGET_VERSION")
+          fi
+          su builder -c "cd '$GITHUB_WORKSPACE' && ./update.sh ${args[*]}"
+
+      - name: Verify PKGBUILD and .SRCINFO consistency
+        run: |
+          su builder -c "cd '$GITHUB_WORKSPACE' && ./verify-build.sh"
+
+      - name: Read updated version
+        id: meta
+        run: |
+          ver="$(grep -E '^pkgver=' PKGBUILD | cut -d= -f2)"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request for human review
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: update oleafly-bin to ${{ steps.meta.outputs.version }}"
+          title: "Update oleafly-bin to v${{ steps.meta.outputs.version }}"
+          body: |
+            Automated upstream release check for **Oleafly v${{ steps.meta.outputs.version }}**.
+
+            ### Verification performed
+            - Verified upstream `src-tauri/tauri.conf.json` updater public key matches pinned `oleafly.pub`
+            - Verified `Oleafly_${{ steps.meta.outputs.version }}_amd64.deb` against `.deb.sig` using `minisign`
+            - Verified Minisign trusted comment matches expected filename and version
+            - Updated `PKGBUILD` (`pkgver`, `pkgrel=1`, `sha256sums`) and regenerated `.SRCINFO`
+
+            > **Note:** Human review and local `makepkg` / runtime testing are recommended before pushing to AUR.
+          branch: "update/v${{ steps.meta.outputs.version }}"
+          delete-branch: true

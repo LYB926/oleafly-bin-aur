@@ -1,0 +1,10 @@
+# makepkg build & package artifacts
+pkg/
+src/
+*.deb
+*.deb.*
+*-LICENSE
+*.pkg.tar*
+*.log
+*.tmp
+test-work/
