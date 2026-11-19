@@ -25,6 +25,7 @@ pkgbase = oleafly-bin
 	optdepends = git: project version history, checkpoints, and remote repository sync
 	optdepends = python: optional bundled AI research skill scripts
 	optdepends = texlive-binextra: external latexmk engine support
+	optdepends = texlive-latex: LaTeX format and core packages for external latexmk builds
 	provides = oleafly=0.4.12
 	conflicts = oleafly
 	noextract = Oleafly_0.4.12_amd64.deb
