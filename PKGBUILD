@@ -1,4 +1,4 @@
-# Maintainer: Oleafly AUR Maintainer <https://github.com/Oleafly/Oleafly>
+# Maintainer: Ke Zhang <zhangke23@m.fudan.edu.cn>
 
 pkgname=oleafly-bin
 _upstream_name=Oleafly
@@ -25,6 +25,7 @@ depends=(
 makedepends=('minisign')
 optdepends=(
   'git: project version history, checkpoints, and remote repository sync'
+  'python: optional bundled AI research skill scripts'
   'texlive-binextra: external latexmk engine support'
 )
 provides=('oleafly')
@@ -47,9 +48,9 @@ sha256sums=(
 verify() {
   local deb_name="${_upstream_name}_${pkgver}_amd64.deb"
   local sig_b64_name="${deb_name}.minisig.b64"
-  local deb_path="${startdir}/${deb_name}"
-  local sig_b64_path="${startdir}/${sig_b64_name}"
-  local pub_path="${startdir}/oleafly.pub"
+  local deb_path="./${deb_name}"
+  local sig_b64_path="./${sig_b64_name}"
+  local pub_path='./oleafly.pub'
 
   if [[ ! -f "$deb_path" && -n "${SRCDEST:-}" && -f "${SRCDEST}/${deb_name}" ]]; then
     deb_path="${SRCDEST}/${deb_name}"
@@ -58,29 +59,29 @@ verify() {
     sig_b64_path="${SRCDEST}/${sig_b64_name}"
   fi
 
-  [[ -f "$deb_path" ]] || { error "Missing DEB payload: $deb_path"; return 1; }
-  [[ -f "$sig_b64_path" ]] || { error "Missing Minisign signature: $sig_b64_path"; return 1; }
-  [[ -f "$pub_path" ]] || { error "Missing pinned Minisign public key: $pub_path"; return 1; }
+  [[ -f "$deb_path" ]] || { printf 'ERROR: Missing DEB payload: %s\n' "$deb_path" >&2; return 1; }
+  [[ -f "$sig_b64_path" ]] || { printf 'ERROR: Missing Minisign signature: %s\n' "$sig_b64_path" >&2; return 1; }
+  [[ -f "$pub_path" ]] || { printf 'ERROR: Missing pinned Minisign public key: %s\n' "$pub_path" >&2; return 1; }
 
   local tmp_sig verify_out
   tmp_sig="$(mktemp)"
   if ! base64 -d "$sig_b64_path" > "$tmp_sig"; then
     rm -f "$tmp_sig"
-    error "Failed to decode Base64 Minisign signature: $sig_b64_path"
+    printf 'ERROR: Failed to decode Base64 Minisign signature: %s\n' "$sig_b64_path" >&2
     return 1
   fi
 
   if ! verify_out="$(minisign -Vm "$deb_path" -p "$pub_path" -x "$tmp_sig" 2>&1)"; then
     printf '%s\n' "$verify_out" >&2
     rm -f "$tmp_sig"
-    error "Minisign signature verification failed for ${deb_name}"
+    printf 'ERROR: Minisign signature verification failed for %s\n' "$deb_name" >&2
     return 1
   fi
   rm -f "$tmp_sig"
   printf '%s\n' "$verify_out"
 
   if ! grep -Fq "file:${deb_name}" <<<"$verify_out" || ! grep -Fq "version:${pkgver}" <<<"$verify_out"; then
-    error "Minisign trusted comment mismatch for ${deb_name} (${pkgver})"
+    printf 'ERROR: Minisign trusted comment mismatch for %s (%s)\n' "$deb_name" "$pkgver" >&2
     return 1
   fi
 }
@@ -97,7 +98,7 @@ prepare() {
 
   local data_tar
   data_tar="$(find "$ar_dir" -maxdepth 1 -type f -name 'data.tar*' | head -n 1)"
-  [[ -n "$data_tar" ]] || { error "Could not locate data.tar.* inside ${deb_file}"; return 1; }
+  [[ -n "$data_tar" ]] || { printf 'ERROR: Could not locate data.tar.* inside %s\n' "$deb_file" >&2; return 1; }
 
   bsdtar -xf "$data_tar" -C "$root_dir"
 }

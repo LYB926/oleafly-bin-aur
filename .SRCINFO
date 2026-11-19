@@ -19,6 +19,7 @@ pkgbase = oleafly-bin
 	depends = libxcrypt-compat
 	depends = webkit2gtk-4.1
 	optdepends = git: project version history, checkpoints, and remote repository sync
+	optdepends = python: optional bundled AI research skill scripts
 	optdepends = texlive-binextra: external latexmk engine support
 	provides = oleafly
 	conflicts = oleafly

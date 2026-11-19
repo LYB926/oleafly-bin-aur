@@ -81,8 +81,8 @@ sudo pacman -S --needed base-devel minisign
 ### Build and Install Locally
 
 ```bash
-git clone https://github.com/<your-user>/oleafly-bin.git
-cd oleafly-bin
+git clone https://github.com/LYB926/oleafly-bin-aur.git
+cd oleafly-bin-aur
 ./verify-build.sh
 makepkg -si
 ```
@@ -128,12 +128,12 @@ Oleafly bundles `tauri-plugin-updater`, but in upstream `src-tauri/src/commands.
 
 ### Recommended Repository Structure
 
-- **GitHub (`oleafly-bin`):** Hosts `PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `README.md`, `.gitignore`, `update.sh`, `verify-build.sh`, and `.github/workflows/update-check.yml`.
+- **GitHub (`LYB926/oleafly-bin-aur`):** Hosts `PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `README.md`, `.gitignore`, `update.sh`, `verify-build.sh`, and `.github/workflows/update-check.yml`.
 - **AUR (`ssh://aur@aur.archlinux.org/oleafly-bin.git`):** Hosts only the AUR package files (`PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `.gitignore`).
 
 ### Initial Publication
 
-1. Create the GitHub repo `oleafly-bin` and push the full repository.
+1. Create the GitHub repo `LYB926/oleafly-bin-aur` and push the full repository.
 2. Add the AUR remote (using your registered AUR SSH key):
    ```bash
    git remote add aur ssh://aur@aur.archlinux.org/oleafly-bin.git
