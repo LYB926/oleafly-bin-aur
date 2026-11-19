@@ -23,11 +23,10 @@ jobs:
     steps:
       - name: Install Arch packaging and verification tools
         run: |
-          pacman -Syu --noconfirm --needed base-devel git minisign python curl base64 >/dev/null 2>&1 || \
-          pacman -Syu --noconfirm --needed base-devel git minisign python curl
+          pacman -Syu --noconfirm --needed base-devel git minisign namcap python curl
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure non-root builder for makepkg
         run: |
@@ -35,6 +34,7 @@ jobs:
           chown -R builder:builder "$GITHUB_WORKSPACE"
 
       - name: Check upstream release, verify Minisign, and update PKGBUILD
+        shell: bash
         env:
           TARGET_VERSION: ${{ inputs.version }}
         run: |
@@ -55,7 +55,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request for human review
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: update oleafly-bin to ${{ steps.meta.outputs.version }}"
           title: "Update oleafly-bin to v${{ steps.meta.outputs.version }}"
