@@ -107,12 +107,36 @@ prepare() {
 package() {
   local root="${srcdir}/deb-root"
 
-  # Main executables, CLI wrapper, and co-packaged tectonic-biber
+  # Main executables and co-packaged tectonic-biber (keep upstream /usr/bin layout
+  # so oleafly-core resolves ../libexec/oleafly and ../lib/Oleafly/resources)
   install -Dm755 -t "$pkgdir/usr/bin" \
-    "$root/usr/bin/oleafly" \
     "$root/usr/bin/oleafly-cli" \
     "$root/usr/bin/oleafly-desktop" \
     "$root/usr/bin/tectonic-biber"
+
+  # Launcher wrapper: default to XWayland when available under Wayland to avoid
+  # WebKitGTK 2.54 + GTK3 transparent-window repaint issues, while respecting
+  # explicit user GDK_BACKEND overrides.
+  install -Dm755 /dev/stdin "$pkgdir/usr/lib/Oleafly/oleafly-desktop-launch" <<'EOF'
+#!/bin/sh
+if [ -z "${GDK_BACKEND:-}" ] && [ -n "${WAYLAND_DISPLAY:-}" ] && [ -n "${DISPLAY:-}" ]; then
+  export GDK_BACKEND=x11
+fi
+exec /usr/bin/oleafly-desktop "$@"
+EOF
+
+  # CLI/GUI dispatcher preserving upstream /usr/bin/oleafly behavior with the
+  # same Wayland -> XWayland fallback for GUI launches (including `oleafly open`)
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/oleafly" <<'EOF'
+#!/bin/sh
+if [ -z "${GDK_BACKEND:-}" ] && [ -n "${WAYLAND_DISPLAY:-}" ] && [ -n "${DISPLAY:-}" ]; then
+  export GDK_BACKEND=x11
+fi
+if [ "$#" -eq 0 ]; then
+  exec /usr/bin/oleafly-desktop
+fi
+exec /usr/bin/oleafly-cli "$@"
+EOF
 
   # Bundled compilation engines expected under /usr/libexec/oleafly
   install -Dm755 -t "$pkgdir/usr/libexec/oleafly" \
@@ -138,6 +162,13 @@ package() {
     "$root/usr/share/kio/servicemenus/oleafly-open-folder.desktop"
   install -Dm644 -t "$pkgdir/usr/share/nemo/actions" \
     "$root/usr/share/nemo/actions/oleafly-open-folder.nemo_action"
+
+  # Route desktop/file-manager launches through the XWayland-safe launcher
+  sed -i 's|^Exec=/usr/bin/oleafly-desktop|Exec=/usr/lib/Oleafly/oleafly-desktop-launch|' \
+    "$pkgdir/usr/share/applications/Oleafly.desktop" \
+    "$pkgdir/usr/share/applications/oleafly-url-handler.desktop" \
+    "$pkgdir/usr/share/kio/servicemenus/oleafly-open-folder.desktop" \
+    "$pkgdir/usr/share/nemo/actions/oleafly-open-folder.nemo_action"
 
   # Hicolor application icons
   local size

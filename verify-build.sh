@@ -58,6 +58,7 @@ if [[ -n "$PKG_FILE" ]]; then
     "usr/libexec/oleafly/pandoc" \
     "usr/libexec/oleafly/tectonic" \
     "usr/libexec/oleafly/typst" \
+    "usr/lib/Oleafly/oleafly-desktop-launch" \
     "usr/lib/Oleafly/resources/skills-catalog.json" \
     "usr/share/applications/Oleafly.desktop" \
     "usr/share/applications/oleafly-url-handler.desktop" \

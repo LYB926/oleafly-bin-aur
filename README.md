@@ -117,6 +117,7 @@ Oleafly bundles `tauri-plugin-updater`, but in upstream `src-tauri/src/commands.
 ## Compatibility & Known Notes
 
 - **Arch Linux / CachyOS (`x86_64`):** Verified on CachyOS rolling (`x86_64`, KDE Plasma 6 Wayland). `libxcrypt-compat` is explicitly included in `depends` so `tectonic-biber` resolves `libcrypt.so.1` cleanly.
+- **Wayland / XWayland rendering:** Under GTK3 Wayland + WebKitGTK 2.54, Oleafly's frameless transparent window can fail to repaint static regions (only animated elements appear on hover). To avoid this out of the box without moving `/usr/bin/oleafly-desktop`, desktop/service entries and `/usr/bin/oleafly` route through `/usr/lib/Oleafly/oleafly-desktop-launch`, which defaults to `GDK_BACKEND=x11` only when `WAYLAND_DISPLAY` and `DISPLAY` are both present and `GDK_BACKEND` is unset. You can always override this explicitly (e.g., `GDK_BACKEND=wayland oleafly`).
 - **KDE Plasma / Dolphin:** Installs `/usr/share/kio/servicemenus/oleafly-open-folder.desktop` natively.
 - **Tectonic TeX package cache:** On the very first LaTeX build, Tectonic downloads TeX packages on demand to `~/.cache/Tectonic` (unless an offline TeX Live `latexmk` installation is used).
 - **`namcap` `/usr/libexec` notice:** `namcap` emits a standard warning/error for ELFs in `/usr/libexec/oleafly/`. This path is intentionally preserved because `oleafly-core` probes `../libexec/oleafly/` relative to `/usr/bin/` and moving them to `/usr/bin/` would conflict with Arch's `pandoc-cli`, `tectonic`, and `typst` packages.
