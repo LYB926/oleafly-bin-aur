@@ -1,0 +1,75 @@
+name: Sync AUR Files to master
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'PKGBUILD'
+      - '.SRCINFO'
+      - 'oleafly.pub'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-master
+  cancel-in-progress: false
+
+jobs:
+  sync-master:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Sync flat AUR files to orphan master branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore; do
+            if [ ! -f "$f" ]; then
+              echo "Error: missing required AUR file '$f' on dev" >&2
+              exit 1
+            fi
+            cp "$f" "$tmp_dir/$f"
+          done
+
+          pkgver="$(grep -E '^pkgver=' PKGBUILD | head -n 1 | cut -d= -f2- | tr -d "'\"")"
+          pkgrel="$(grep -E '^pkgrel=' PKGBUILD | head -n 1 | cut -d= -f2- | tr -d "'\"")"
+          dev_sha="$(git rev-parse --short HEAD)"
+
+          git fetch origin +refs/heads/master:refs/remotes/origin/master
+          git checkout -B master refs/remotes/origin/master
+
+          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore; do
+            cp "$tmp_dir/$f" "./$f"
+          done
+          git add -- PKGBUILD .SRCINFO oleafly.pub .gitignore
+
+          tracked="$(git ls-files | LC_ALL=C sort)"
+          expected="$(printf '%s\n' .SRCINFO .gitignore PKGBUILD oleafly.pub)"
+          if [ "$tracked" != "$expected" ]; then
+            echo "Error: unexpected tracked files on master:" >&2
+            printf '%s\n' "$tracked" >&2
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "==> master is already in sync with dev (${pkgver}-${pkgrel})."
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore: sync oleafly-bin ${pkgver}-${pkgrel} from dev (${dev_sha})"
+          git push origin master

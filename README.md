@@ -16,10 +16,10 @@ The existing AUR [`oleafly`](https://aur.archlinux.org/packages/oleafly) package
 | Node.js / pnpm / Rust needed | Yes (`nodejs-lts-krypton`, `pnpm`, `cargo`, `cargo-tauri`) | **No** (no compiler or Node.js required) |
 | Node.js 26 conflict | Conflicts with `nodejs-lts-krypton` | **None** |
 | Bundled compilers | Symlinks system `tectonic`, `typst`, `pandoc`, `biber` | **Self-contained** (`/usr/libexec/oleafly/*`, `/usr/bin/tectonic-biber`) |
-| Upstream `AGPL-3.0-or-later` license | Declared `MIT` in AUR `oleafly` (0.4.11) | **Correct `AGPL-3.0-or-later`** |
+| Upstream `AGPL-3.0-or-later` + bundled licenses | Declared `MIT` in AUR `oleafly` (0.4.11) | **Oleafly `AGPL-3.0-or-later` + bundled component SPDX licenses** |
 | Cryptographic verification | Source tarball SHA-256 | **SHA-256 + pinned Minisign signature** |
 
-Both packages set `provides=('oleafly')` and `conflicts=('oleafly')`.
+Both packages set `provides=("oleafly=${pkgver}")` (or `oleafly`) and `conflicts=('oleafly')`.
 
 ---
 
@@ -27,7 +27,8 @@ Both packages set `provides=('oleafly')` and `conflicts=('oleafly')`.
 
 - **Upstream repository:** <https://github.com/Oleafly/Oleafly>
 - **Upstream releases:** <https://github.com/Oleafly/Oleafly/releases>
-- **License:** `AGPL-3.0-or-later` (installed to `/usr/share/licenses/oleafly-bin/LICENSE`, matching upstream `LICENSE`). Third-party bundled notices are included under `/usr/lib/Oleafly/resources/licenses/`.
+- **Licenses:** `AGPL-3.0-or-later` (Oleafly), `Apache-2.0` (Typst, Tinymist), `Artistic-2.0 OR GPL-1.0-or-later` (Biber), `GPL-2.0-or-later` (Pandoc), and `MIT` (Tectonic, bundled scientific agent skills).
+  - `/usr/share/licenses/oleafly-bin/LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.md`, and `third-party/` notices are installed alongside `/usr/lib/Oleafly/resources/licenses/`.
 
 ---
 
@@ -41,12 +42,12 @@ Upstream Oleafly signs every release installer for the Tauri Updater using **Min
 2. **Avoiding `makepkg` PGP misdetection:**
    - Because `makepkg` automatically treats `.sig` source files as detached PGP signatures, `PKGBUILD` renames the downloaded `.deb.sig` to `Oleafly_${pkgver}_amd64.deb.minisig.b64`.
 3. **Dual Verification before Unpacking:**
-   - First, `makepkg` validates `sha256sums` for all four sources (`.deb`, `.minisig.b64`, `LICENSE`, `oleafly.pub`).
-   - Next, `makepkg` executes `verify()` before extracting any archive:
+   - First, `makepkg` validates `sha256sums` for all six sources (`.deb`, `.minisig.b64`, `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.md`, `oleafly.pub`), and `noextract` leaves the `.deb` unextracted.
+   - Next, at the start of `prepare()` before running `bsdtar` (which preserves clean-chroot compatibility under `archlinux/devtools#224` while still verifying before extraction):
      - Decodes `Oleafly_${pkgver}_amd64.deb.minisig.b64` from Base64.
      - Runs `minisign -Vm` against the `.deb` using `oleafly.pub`.
-     - Confirms the cryptographically signed `Trusted comment` matches `file:Oleafly_${pkgver}_amd64.deb` and `version:${pkgver}` (preventing file-swap or rollback attacks).
-   - Any failure aborts the build before `prepare()` or `package()` runs.
+     - Confirms the cryptographically signed `Trusted comment:` line contains exact `file:Oleafly_${pkgver}_amd64.deb` and `version:${pkgver}` tokens (preventing file-swap, prefix, or rollback attacks).
+   - Any failure aborts the build before extracting any archive or entering `package()`.
 
 ---
 
@@ -117,7 +118,7 @@ Oleafly bundles `tauri-plugin-updater`, but in upstream `src-tauri/src/commands.
 ## Compatibility & Known Notes
 
 - **Arch Linux / CachyOS (`x86_64`):** Verified on CachyOS rolling (`x86_64`, KDE Plasma 6 Wayland). `libxcrypt-compat` is explicitly included in `depends` so `tectonic-biber` resolves `libcrypt.so.1` cleanly.
-- **Wayland / XWayland rendering:** Under GTK3 Wayland + WebKitGTK 2.54, Oleafly's frameless transparent window can fail to repaint static regions (only animated elements appear on hover). To avoid this out of the box without moving `/usr/bin/oleafly-desktop`, desktop/service entries and `/usr/bin/oleafly` route through `/usr/lib/Oleafly/oleafly-desktop-launch`, which defaults to `GDK_BACKEND=x11` only when `WAYLAND_DISPLAY` and `DISPLAY` are both present and `GDK_BACKEND` is unset. You can always override this explicitly (e.g., `GDK_BACKEND=wayland oleafly`).
+- **Wayland / XWayland rendering:** Under GTK3 Wayland + WebKitGTK 2.54, Oleafly's frameless transparent window can fail to repaint static regions (only animated elements appear on hover). To avoid this out of the box without moving `/usr/bin/oleafly-desktop`, desktop/service entries invoke `/usr/lib/Oleafly/oleafly-desktop-launch` while `/usr/bin/oleafly` applies the same `GDK_BACKEND=x11` fallback inline before executing `oleafly-desktop` or `oleafly-cli` (only when `WAYLAND_DISPLAY` and `DISPLAY` are both present and `GDK_BACKEND` is unset). You can always override this explicitly (e.g., `GDK_BACKEND=wayland oleafly`).
 - **KDE Plasma / Dolphin:** Installs `/usr/share/kio/servicemenus/oleafly-open-folder.desktop` natively.
 - **Tectonic TeX package cache:** On the very first LaTeX build, Tectonic downloads TeX packages on demand to `~/.cache/Tectonic` (unless an offline TeX Live `latexmk` installation is used).
 - **`namcap` `/usr/libexec` notice:** `namcap` emits a standard warning/error for ELFs in `/usr/libexec/oleafly/`. This path is intentionally preserved because `oleafly-core` probes `../libexec/oleafly/` relative to `/usr/bin/` and moving them to `/usr/bin/` would conflict with Arch's `pandoc-cli`, `tectonic`, and `typst` packages.
@@ -125,27 +126,7 @@ Oleafly bundles `tauri-plugin-updater`, but in upstream `src-tauri/src/commands.
 
 ---
 
-## GitHub & AUR Maintenance Workflow
+## Repository Branches
 
-### Recommended Repository Structure
-
-- **GitHub (`LYB926/oleafly-bin-aur`):** Hosts `PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `README.md`, `.gitignore`, `update.sh`, `verify-build.sh`, and `.github/workflows/update-check.yml`.
-- **AUR (`ssh://aur@aur.archlinux.org/oleafly-bin.git`):** Hosts only the AUR package files (`PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `.gitignore`).
-
-### Initial Publication
-
-1. Create the GitHub repo `LYB926/oleafly-bin-aur` and push the full repository.
-2. Add the AUR remote (using your registered AUR SSH key):
-   ```bash
-   git remote add aur ssh://aur@aur.archlinux.org/oleafly-bin.git
-   ```
-3. To keep AUR clean (without GitHub-only README/workflows/scripts if desired), push an AUR-specific branch or subtree, or maintain a dedicated `aur` branch containing `PKGBUILD`, `.SRCINFO`, `oleafly.pub`, and `.gitignore`:
-   ```bash
-   git push aur aur:master
-   ```
-
-### Ongoing Release Updates
-
-1. GitHub Actions (`.github/workflows/update-check.yml`) runs daily, executes `./update.sh`, verifies Minisign + SHA-256, and opens a Pull Request on GitHub.
-2. Maintainer reviews the PR, runs `makepkg -si` + smoke tests locally, and merges the PR.
-3. Sync `PKGBUILD`, `.SRCINFO`, and `oleafly.pub` to the AUR `master` branch and push (`git push aur ...:master`).
+- **`dev` (GitHub default branch):** Full repository including documentation, helper scripts (`update.sh`, `verify-build.sh`), and GitHub Actions workflows.
+- **`master` (AUR-ready flat orphan branch):** Contains only the four root-level files required by AUR (`PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `.gitignore`) with zero subdirectories in commit history, matching `aurweb` repository rules. Whenever those files change on `dev`, GitHub Actions automatically fast-forward syncs them to `master` so `master` can be cloned or pushed directly to `ssh://aur@aur.archlinux.org/oleafly-bin.git`.

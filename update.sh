@@ -109,6 +109,8 @@ LATEST_VER="${META[0]}"
 DEB_URL="${META[1]}"
 SIG_URL="${META[2]}"
 LICENSE_URL="https://raw.githubusercontent.com/${REPO}/v${LATEST_VER}/LICENSE"
+NOTICE_URL="https://raw.githubusercontent.com/${REPO}/v${LATEST_VER}/NOTICE"
+THIRD_PARTY_URL="https://raw.githubusercontent.com/${REPO}/v${LATEST_VER}/THIRD_PARTY_LICENSES.md"
 TAURI_CONF_URL="https://raw.githubusercontent.com/${REPO}/v${LATEST_VER}/src-tauri/tauri.conf.json"
 
 echo "==> Current pkgver: $CURRENT_VER"
@@ -122,11 +124,15 @@ fi
 DEB_NAME="Oleafly_${LATEST_VER}_amd64.deb"
 SIG_B64_NAME="${DEB_NAME}.minisig.b64"
 LICENSE_NAME="oleafly-${LATEST_VER}-LICENSE"
+NOTICE_NAME="oleafly-${LATEST_VER}-NOTICE"
+THIRD_PARTY_NAME="oleafly-${LATEST_VER}-THIRD_PARTY_LICENSES.md"
 
 DEB_PATH="$TMP_DIR/$DEB_NAME"
 SIG_B64_PATH="$TMP_DIR/$SIG_B64_NAME"
 SIG_BIN_PATH="$TMP_DIR/${DEB_NAME}.minisig"
 LICENSE_PATH="$TMP_DIR/$LICENSE_NAME"
+NOTICE_PATH="$TMP_DIR/$NOTICE_NAME"
+THIRD_PARTY_PATH="$TMP_DIR/$THIRD_PARTY_NAME"
 TAURI_CONF_PATH="$TMP_DIR/tauri.conf.json"
 
 echo "==> Checking upstream tauri.conf.json updater public key"
@@ -144,10 +150,12 @@ if upstream_pub != pinned_pub:
 PY
 echo "    Pinned oleafly.pub matches upstream v${LATEST_VER} tauri.conf.json"
 
-echo "==> Downloading DEB, Minisign signature, and LICENSE"
+echo "==> Downloading DEB, Minisign signature, and license files"
 curl -fSL "$DEB_URL" -o "$DEB_PATH"
 curl -fSL "$SIG_URL" -o "$SIG_B64_PATH"
 curl -fsSL "$LICENSE_URL" -o "$LICENSE_PATH"
+curl -fsSL "$NOTICE_URL" -o "$NOTICE_PATH"
+curl -fsSL "$THIRD_PARTY_URL" -o "$THIRD_PARTY_PATH"
 
 echo "==> Verifying Minisign signature against pinned oleafly.pub"
 base64 -d "$SIG_B64_PATH" > "$SIG_BIN_PATH"
@@ -158,7 +166,15 @@ VERIFY_OUT="$(minisign -Vm "$DEB_PATH" -p "$PUBKEY_FILE" -x "$SIG_BIN_PATH" 2>&1
 }
 printf '%s\n' "$VERIFY_OUT"
 
-if ! grep -Fq "file:${DEB_NAME}" <<<"$VERIFY_OUT" || ! grep -Fq "version:${LATEST_VER}" <<<"$VERIFY_OUT"; then
+TRUSTED_COMMENT="$(awk '/^Trusted comment:[[:space:]]*/ { sub(/^Trusted comment:[[:space:]]*/, ""); print; exit }' <<<"$VERIFY_OUT")"
+read -r -a TRUSTED_TOKENS <<<"$TRUSTED_COMMENT"
+HAS_FILE=0
+HAS_VER=0
+for tok in "${TRUSTED_TOKENS[@]}"; do
+  [[ "$tok" == "file:${DEB_NAME}" ]] && HAS_FILE=1
+  [[ "$tok" == "version:${LATEST_VER}" ]] && HAS_VER=1
+done
+if (( ! HAS_FILE || ! HAS_VER )); then
   echo "Error: Minisign trusted comment does not match ${DEB_NAME} (${LATEST_VER})" >&2
   exit 1
 fi
@@ -166,18 +182,22 @@ fi
 DEB_SHA="$(sha256sum "$DEB_PATH" | awk '{print $1}')"
 SIG_SHA="$(sha256sum "$SIG_B64_PATH" | awk '{print $1}')"
 LIC_SHA="$(sha256sum "$LICENSE_PATH" | awk '{print $1}')"
+NOTICE_SHA="$(sha256sum "$NOTICE_PATH" | awk '{print $1}')"
+THIRD_PARTY_SHA="$(sha256sum "$THIRD_PARTY_PATH" | awk '{print $1}')"
 PUB_SHA="$(sha256sum "$PUBKEY_FILE" | awk '{print $1}')"
 
 echo "==> Computed SHA-256 checksums:"
-echo "    DEB:     $DEB_SHA"
-echo "    SIG.b64: $SIG_SHA"
-echo "    LICENSE: $LIC_SHA"
-echo "    PUBKEY:  $PUB_SHA"
+echo "    DEB:         $DEB_SHA"
+echo "    SIG.b64:     $SIG_SHA"
+echo "    LICENSE:     $LIC_SHA"
+echo "    NOTICE:      $NOTICE_SHA"
+echo "    THIRD_PARTY: $THIRD_PARTY_SHA"
+echo "    PUBKEY:      $PUB_SHA"
 
 echo "==> Updating PKGBUILD"
-python3 - "$PKGBUILD_FILE" "$LATEST_VER" "$DEB_SHA" "$SIG_SHA" "$LIC_SHA" "$PUB_SHA" <<'PY'
+python3 - "$PKGBUILD_FILE" "$LATEST_VER" "$DEB_SHA" "$SIG_SHA" "$LIC_SHA" "$NOTICE_SHA" "$THIRD_PARTY_SHA" "$PUB_SHA" <<'PY'
 import re, sys
-pkgbuild_path, ver, deb_sha, sig_sha, lic_sha, pub_sha = sys.argv[1:7]
+pkgbuild_path, ver, deb_sha, sig_sha, lic_sha, notice_sha, third_party_sha, pub_sha = sys.argv[1:9]
 text = open(pkgbuild_path, encoding="utf-8").read()
 
 text, n1 = re.subn(r'^pkgver=.*$', f'pkgver={ver}', text, count=1, flags=re.M)
@@ -187,6 +207,8 @@ new_sums = (
     f"  '{deb_sha}'\n"
     f"  '{sig_sha}'\n"
     f"  '{lic_sha}'\n"
+    f"  '{notice_sha}'\n"
+    f"  '{third_party_sha}'\n"
     f"  '{pub_sha}'\n"
     ")"
 )
@@ -214,6 +236,8 @@ if [[ "$DO_BUILD" -eq 1 ]]; then
   cp "$DEB_PATH" "$SCRIPT_DIR/$DEB_NAME"
   cp "$SIG_B64_PATH" "$SCRIPT_DIR/$SIG_B64_NAME"
   cp "$LICENSE_PATH" "$SCRIPT_DIR/$LICENSE_NAME"
+  cp "$NOTICE_PATH" "$SCRIPT_DIR/$NOTICE_NAME"
+  cp "$THIRD_PARTY_PATH" "$SCRIPT_DIR/$THIRD_PARTY_NAME"
   makepkg -fc --noconfirm
 fi
 

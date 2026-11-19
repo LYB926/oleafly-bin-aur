@@ -39,15 +39,19 @@ jobs:
           TARGET_VERSION: ${{ inputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          args=()
-          if [ -n "$TARGET_VERSION" ]; then
-            args+=(--version "$TARGET_VERSION")
-          fi
-          su -w GITHUB_TOKEN builder -c "cd '$GITHUB_WORKSPACE' && ./update.sh ${args[*]}"
+          su -w GITHUB_TOKEN,TARGET_VERSION,GITHUB_WORKSPACE builder -c '
+            set -euo pipefail
+            cd "$GITHUB_WORKSPACE"
+            if [ -n "${TARGET_VERSION:-}" ]; then
+              ./update.sh --version "$TARGET_VERSION"
+            else
+              ./update.sh
+            fi
+          '
 
       - name: Verify PKGBUILD and .SRCINFO consistency
         run: |
-          su builder -c "cd '$GITHUB_WORKSPACE' && ./verify-build.sh"
+          su -w GITHUB_WORKSPACE builder -c 'cd "$GITHUB_WORKSPACE" && ./verify-build.sh'
 
       - name: Read updated version
         id: meta

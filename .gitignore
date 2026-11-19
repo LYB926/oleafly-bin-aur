@@ -4,6 +4,8 @@ src/
 *.deb
 *.deb.*
 *-LICENSE
+*-NOTICE
+*-THIRD_PARTY_LICENSES.md
 *.pkg.tar*
 *.log
 *.tmp

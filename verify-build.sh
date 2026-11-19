@@ -26,12 +26,18 @@ else
   echo "==> 3. Skipping namcap (not installed)"
 fi
 
-echo "==> 4. Checking verify() hook is present and no SKIP checksums exist"
+echo "==> 4. Checking prepare() Minisign verification precedes extraction and no SKIP checksums exist"
 if grep -qE "'SKIP'|\"SKIP\"" PKGBUILD; then
   echo "Error: PKGBUILD contains SKIP checksums" >&2
   exit 1
 fi
-grep -q '^verify()' PKGBUILD || { echo "Error: verify() function missing" >&2; exit 1; }
+grep -q '^prepare()' PKGBUILD || { echo "Error: prepare() function missing" >&2; exit 1; }
+MINISIGN_LINE="$(grep -n 'minisign -Vm' PKGBUILD | head -n 1 | cut -d: -f1)"
+BSDTAR_LINE="$(grep -n 'bsdtar -xf' PKGBUILD | head -n 1 | cut -d: -f1)"
+if [[ -z "$MINISIGN_LINE" || -z "$BSDTAR_LINE" || "$MINISIGN_LINE" -ge "$BSDTAR_LINE" ]]; then
+  echo "Error: PKGBUILD must run 'minisign -Vm' before 'bsdtar -xf' in prepare()" >&2
+  exit 1
+fi
 
 PKG_FILE="$(find "$SCRIPT_DIR" -maxdepth 1 -type f -name 'oleafly-bin-*.pkg.tar*' | sort | tail -n 1 || true)"
 if [[ -n "$PKG_FILE" ]]; then
@@ -63,7 +69,9 @@ if [[ -n "$PKG_FILE" ]]; then
     "usr/share/applications/Oleafly.desktop" \
     "usr/share/applications/oleafly-url-handler.desktop" \
     "usr/share/kio/servicemenus/oleafly-open-folder.desktop" \
-    "usr/share/licenses/oleafly-bin/LICENSE"
+    "usr/share/licenses/oleafly-bin/LICENSE" \
+    "usr/share/licenses/oleafly-bin/NOTICE" \
+    "usr/share/licenses/oleafly-bin/THIRD_PARTY_LICENSES.md"
   do
     grep -Fxq "$req" <<<"$CONTENTS" || { echo "Error: missing $req in package" >&2; exit 1; }
   done

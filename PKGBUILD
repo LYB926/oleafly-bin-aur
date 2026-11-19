@@ -5,10 +5,16 @@ pkgname=oleafly-bin
 _upstream_name=Oleafly
 pkgver=0.4.12
 pkgrel=1
-pkgdesc='Local-first AI-assisted research workspace for LaTeX, Typst, and Markdown (prebuilt)'
+pkgdesc='Local-first AI research workspace for LaTeX, Typst, and Markdown (prebuilt)'
 arch=('x86_64')
 url='https://github.com/Oleafly/Oleafly'
-license=('AGPL-3.0-or-later')
+license=(
+  'AGPL-3.0-or-later'
+  'Apache-2.0'
+  'Artistic-2.0 OR GPL-1.0-or-later'
+  'GPL-2.0-or-later'
+  'MIT'
+)
 depends=(
   'bash'
   'cairo'
@@ -29,13 +35,15 @@ optdepends=(
   'python: optional bundled AI research skill scripts'
   'texlive-binextra: external latexmk engine support'
 )
-provides=('oleafly')
+provides=("oleafly=${pkgver}")
 conflicts=('oleafly')
 options=('!strip' '!debug')
 source=(
   "${_upstream_name}_${pkgver}_amd64.deb::${url}/releases/download/v${pkgver}/${_upstream_name}_${pkgver}_amd64.deb"
   "${_upstream_name}_${pkgver}_amd64.deb.minisig.b64::${url}/releases/download/v${pkgver}/${_upstream_name}_${pkgver}_amd64.deb.sig"
   "oleafly-${pkgver}-LICENSE::https://raw.githubusercontent.com/Oleafly/Oleafly/v${pkgver}/LICENSE"
+  "oleafly-${pkgver}-NOTICE::https://raw.githubusercontent.com/Oleafly/Oleafly/v${pkgver}/NOTICE"
+  "oleafly-${pkgver}-THIRD_PARTY_LICENSES.md::https://raw.githubusercontent.com/Oleafly/Oleafly/v${pkgver}/THIRD_PARTY_LICENSES.md"
   'oleafly.pub'
 )
 noextract=("${_upstream_name}_${pkgver}_amd64.deb")
@@ -43,36 +51,31 @@ sha256sums=(
   '751eb19205099467eb26627eb117e99d020fb6bb79dc34cf0eed3d4db9e97292'
   '79e22380c16988fa58cf378cc177b3969f21d0652139636eed3b2c23d3e8dc14'
   '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0'
+  'd5bba856badcbafd3f4300193774125defa9f7b653be9198d2d678cd9db57f28'
+  '724e3c893de1a3a520085e9b1e8a84a307c320f07ef1cdaddeddda5092abb8b7'
   'bb414de32bcdfd4cc9de5c2299b2a8c877e32e70e68c3bfebc6d7f6aa104a7dc'
 )
 
-verify() {
+prepare() {
   local deb_name="${_upstream_name}_${pkgver}_amd64.deb"
   local sig_b64_name="${deb_name}.minisig.b64"
-  local deb_path="./${deb_name}"
-  local sig_b64_path="./${sig_b64_name}"
-  local pub_path='./oleafly.pub'
+  local deb_file="${srcdir}/${deb_name}"
+  local sig_b64_file="${srcdir}/${sig_b64_name}"
+  local pub_file="${srcdir}/oleafly.pub"
 
-  if [[ ! -f "$deb_path" && -n "${SRCDEST:-}" && -f "${SRCDEST}/${deb_name}" ]]; then
-    deb_path="${SRCDEST}/${deb_name}"
-  fi
-  if [[ ! -f "$sig_b64_path" && -n "${SRCDEST:-}" && -f "${SRCDEST}/${sig_b64_name}" ]]; then
-    sig_b64_path="${SRCDEST}/${sig_b64_name}"
-  fi
-
-  [[ -f "$deb_path" ]] || { printf 'ERROR: Missing DEB payload: %s\n' "$deb_path" >&2; return 1; }
-  [[ -f "$sig_b64_path" ]] || { printf 'ERROR: Missing Minisign signature: %s\n' "$sig_b64_path" >&2; return 1; }
-  [[ -f "$pub_path" ]] || { printf 'ERROR: Missing pinned Minisign public key: %s\n' "$pub_path" >&2; return 1; }
+  [[ -f "$deb_file" ]] || { printf 'ERROR: Missing DEB payload: %s\n' "$deb_file" >&2; return 1; }
+  [[ -f "$sig_b64_file" ]] || { printf 'ERROR: Missing Minisign signature: %s\n' "$sig_b64_file" >&2; return 1; }
+  [[ -f "$pub_file" ]] || { printf 'ERROR: Missing pinned Minisign public key: %s\n' "$pub_file" >&2; return 1; }
 
   local tmp_sig verify_out
   tmp_sig="$(mktemp)"
-  if ! base64 -d "$sig_b64_path" > "$tmp_sig"; then
+  if ! base64 -d "$sig_b64_file" > "$tmp_sig"; then
     rm -f "$tmp_sig"
-    printf 'ERROR: Failed to decode Base64 Minisign signature: %s\n' "$sig_b64_path" >&2
+    printf 'ERROR: Failed to decode Base64 Minisign signature: %s\n' "$sig_b64_file" >&2
     return 1
   fi
 
-  if ! verify_out="$(minisign -Vm "$deb_path" -p "$pub_path" -x "$tmp_sig" 2>&1)"; then
+  if ! verify_out="$(minisign -Vm "$deb_file" -p "$pub_file" -x "$tmp_sig" 2>&1)"; then
     printf '%s\n' "$verify_out" >&2
     rm -f "$tmp_sig"
     printf 'ERROR: Minisign signature verification failed for %s\n' "$deb_name" >&2
@@ -81,14 +84,19 @@ verify() {
   rm -f "$tmp_sig"
   printf '%s\n' "$verify_out"
 
-  if ! grep -Fq "file:${deb_name}" <<<"$verify_out" || ! grep -Fq "version:${pkgver}" <<<"$verify_out"; then
+  local trusted_comment tok has_file=0 has_ver=0
+  local -a tokens=()
+  trusted_comment="$(awk '/^Trusted comment:[[:space:]]*/ { sub(/^Trusted comment:[[:space:]]*/, ""); print; exit }' <<<"$verify_out")"
+  read -r -a tokens <<<"$trusted_comment"
+  for tok in "${tokens[@]}"; do
+    [[ "$tok" == "file:${deb_name}" ]] && has_file=1
+    [[ "$tok" == "version:${pkgver}" ]] && has_ver=1
+  done
+  if (( ! has_file || ! has_ver )); then
     printf 'ERROR: Minisign trusted comment mismatch for %s (%s)\n' "$deb_name" "$pkgver" >&2
     return 1
   fi
-}
 
-prepare() {
-  local deb_file="${srcdir}/${_upstream_name}_${pkgver}_amd64.deb"
   local ar_dir="${srcdir}/deb-ar"
   local root_dir="${srcdir}/deb-root"
 
@@ -177,7 +185,13 @@ EOF
       "$root/usr/share/icons/hicolor/${size}/apps/oleafly-desktop.png"
   done
 
-  # Upstream AGPL-3.0-or-later license
+  # Upstream AGPL-3.0-or-later license, attribution notice, and third-party license notices
   install -Dm644 "$srcdir/oleafly-${pkgver}-LICENSE" \
     "$pkgdir/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "$srcdir/oleafly-${pkgver}-NOTICE" \
+    "$pkgdir/usr/share/licenses/${pkgname}/NOTICE"
+  install -Dm644 "$srcdir/oleafly-${pkgver}-THIRD_PARTY_LICENSES.md" \
+    "$pkgdir/usr/share/licenses/${pkgname}/THIRD_PARTY_LICENSES.md"
+  find "$root/usr/lib/Oleafly/resources/licenses" -maxdepth 1 -type f \
+    -exec install -Dm644 -t "$pkgdir/usr/share/licenses/${pkgname}/third-party" {} +
 }
