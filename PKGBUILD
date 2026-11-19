@@ -1,4 +1,5 @@
-# Maintainer: Ke Zhang <zhangke23@m.fudan.edu.cn>
+# Maintainer: w568w <w568w at outlook dot com>
+# Contributor: Ke Zhang <zhangke23 at m dot fudan dot edu dot cn>
 
 pkgname=oleafly-bin
 _upstream_name=Oleafly
