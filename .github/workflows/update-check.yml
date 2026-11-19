@@ -37,12 +37,13 @@ jobs:
         shell: bash
         env:
           TARGET_VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           args=()
           if [ -n "$TARGET_VERSION" ]; then
             args+=(--version "$TARGET_VERSION")
           fi
-          su builder -c "cd '$GITHUB_WORKSPACE' && ./update.sh ${args[*]}"
+          su -w GITHUB_TOKEN builder -c "cd '$GITHUB_WORKSPACE' && ./update.sh ${args[*]}"
 
       - name: Verify PKGBUILD and .SRCINFO consistency
         run: |

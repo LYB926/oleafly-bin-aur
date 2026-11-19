@@ -79,7 +79,11 @@ else
 fi
 
 echo "==> Querying upstream release metadata: $API_URL"
-curl -fsSL -H 'Accept: application/vnd.github+json' "$API_URL" -o "$RELEASE_JSON"
+CURL_API_ARGS=(-fsSL -H 'Accept: application/vnd.github+json' -H 'User-Agent: oleafly-bin-aur-updater')
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  CURL_API_ARGS+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+fi
+curl "${CURL_API_ARGS[@]}" "$API_URL" -o "$RELEASE_JSON"
 
 readarray -t META < <(python3 - "$RELEASE_JSON" <<'PY'
 import json, sys
