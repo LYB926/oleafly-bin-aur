@@ -9,6 +9,7 @@ on:
       - '.SRCINFO'
       - 'oleafly.pub'
       - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
@@ -36,7 +37,7 @@ jobs:
           tmp_dir="$(mktemp -d)"
           trap 'rm -rf "$tmp_dir"' EXIT
 
-          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore; do
+          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore LICENSE; do
             if [ ! -f "$f" ]; then
               echo "Error: missing required AUR file '$f' on dev" >&2
               exit 1
@@ -51,13 +52,13 @@ jobs:
           git fetch origin +refs/heads/master:refs/remotes/origin/master
           git checkout -B master refs/remotes/origin/master
 
-          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore; do
+          for f in PKGBUILD .SRCINFO oleafly.pub .gitignore LICENSE; do
             cp "$tmp_dir/$f" "./$f"
           done
-          git add -- PKGBUILD .SRCINFO oleafly.pub .gitignore
+          git add -- PKGBUILD .SRCINFO oleafly.pub .gitignore LICENSE
 
           tracked="$(git ls-files | LC_ALL=C sort)"
-          expected="$(printf '%s\n' .SRCINFO .gitignore PKGBUILD oleafly.pub)"
+          expected="$(printf '%s\n' .SRCINFO .gitignore LICENSE PKGBUILD oleafly.pub)"
           if [ "$tracked" != "$expected" ]; then
             echo "Error: unexpected tracked files on master:" >&2
             printf '%s\n' "$tracked" >&2

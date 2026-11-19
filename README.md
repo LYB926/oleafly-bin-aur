@@ -129,4 +129,4 @@ Oleafly bundles `tauri-plugin-updater`, but in upstream `src-tauri/src/commands.
 ## Repository Branches
 
 - **`dev` (GitHub default branch):** Full repository including documentation, helper scripts (`update.sh`, `verify-build.sh`), and GitHub Actions workflows.
-- **`master` (AUR-ready flat orphan branch):** Contains only the four root-level files required by AUR (`PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `.gitignore`) with zero subdirectories in commit history, matching `aurweb` repository rules. Whenever those files change on `dev`, GitHub Actions automatically fast-forward syncs them to `master` so `master` can be cloned or pushed directly to `ssh://aur@aur.archlinux.org/oleafly-bin.git`.
+- **`master` (AUR-ready flat orphan branch):** Contains only the five root-level files required by AUR (`PKGBUILD`, `.SRCINFO`, `oleafly.pub`, `.gitignore`, `LICENSE`) with zero subdirectories in commit history, matching `aurweb` repository rules. Whenever those files change on `dev`, GitHub Actions automatically fast-forward syncs them to `master` so `master` can be cloned or pushed directly to `ssh://aur@aur.archlinux.org/oleafly-bin.git`.

@@ -34,6 +34,7 @@ optdepends=(
   'git: project version history, checkpoints, and remote repository sync'
   'python: optional bundled AI research skill scripts'
   'texlive-binextra: external latexmk engine support'
+  'texlive-latex: LaTeX format and core packages for external latexmk builds'
 )
 provides=("oleafly=${pkgver}")
 conflicts=('oleafly')
